@@ -27,31 +27,24 @@ namespace Aoc2020
                .ToList();
         }
 
-        public record PasswordEntry(int Num1, int Num2, char Letter, string Password)
+        public record PasswordEntry
         {
-            public static PasswordEntry Parse(string line)
-            {
-                var pattern = new Regex("^(?<min>\\d*)-(?<max>\\d*) (?<letter>[a-z]): (?<password>[a-z]*)$", RegexOptions.Compiled);
-                var match = pattern.Match(line);
+            public int Num1 { get; init; }
+            public int Num2 { get; init; }
+            public char Letter { get; init; }
+            public string Password { get; init; }
 
-                return new PasswordEntry(
-                    int.Parse(match.Groups["min"].Value),
-                    int.Parse(match.Groups["max"].Value),
-                    match.Groups["letter"].Value.First(),
-                    match.Groups["password"].Value);
+            private static readonly Regex parser = new($"^(?<{nameof(Num1)}>\\d*)-(?<{nameof(Num2)}>\\d*) (?<{nameof(Letter)}>[a-z]): (?<{nameof(Password)}>[a-z]*)$");
 
-            }
-            public bool IsValidPart1
-            {
-                get
-                {
-                    var actual = Password.Count(c => c == Letter);
-                    return Num1 <= actual && actual <= Num2;
-                }
-            }
+            public static PasswordEntry Parse(string line) => parser.Deserialize<PasswordEntry>(line);
 
+            public bool IsValidPart1 => WithinRange(Num1, Num2, Password.Count(c => c == Letter));
             public bool IsValidPart2 => Part2Letters.Count(c => c == Letter) == 1;
-            public string Part2Letters => new(new [] {Password[Num1 - 1], Password[Num2 - 1]});
+
+            string Part2Letters => new(new [] {Password[Num1 - 1], Password[Num2 - 1]});
+
+            static bool WithinRange(int min, int max, int num) => min <= num && num <= max;
         }
     }
+
 }
