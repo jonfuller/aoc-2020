@@ -33,9 +33,8 @@ namespace Aoc2020
                .TraverseSlope(slope)
                .Count(c => c.IsTree);
 
-            long SlopeProduct(Map map, IEnumerable<(int x, int y)> slopes) => slopes
+            static long SlopeProduct(Map map, IEnumerable<(int x, int y)> slopes) => slopes
                .Select(s => CountTrees(map, s))
-               .Pipe(x => console.Output.WriteLine(x))
                .Aggregate(seed: (long)1, (seed, count) => seed * count);
         }
     }
