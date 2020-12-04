@@ -28,16 +28,8 @@ namespace Aoc2020
 
         private static IEnumerable<Passport> LoadPassports(string filename) => File
            .ReadLines(filename)
-           .Aggregate(
-                new List<string>() {""},
-                (acc, line) =>
-                {
-                    if (string.IsNullOrWhiteSpace(line))
-                        acc.Add("");
-                    acc[Index.FromEnd(1)] += " " + line;
-
-                    return acc;
-                })
+           .Split(string.IsNullOrWhiteSpace)
+           .Select(s => s.ToDelimitedString(" "))
            .Select(ParsePassport);
 
         private static Passport ParsePassport(string line)
