@@ -43,23 +43,12 @@ namespace Aoc2020
 
     public record Passport(Dictionary<string, string> Pairs)
     {
-        public bool ValidPart1 => RequiredKeys.All(Pairs.ContainsKey);
+        public bool ValidPart1 => Validators.Select(v => v.Key).All(Pairs.ContainsKey);
         public bool ValidPart2 => ValidPart1 && Validators
            .Select(v => (key: v.Key, value: Pairs[v.Key], valid: v.Checker(Pairs[v.Key])))
            .All(v => v.valid);
 
         record Validator(string Key, Func<string, bool> Checker);
-
-        private static readonly IEnumerable<string> RequiredKeys = new[]
-        {
-            "byr",
-            "iyr",
-            "eyr",
-            "hgt",
-            "hcl",
-            "ecl",
-            "pid",
-        };
 
         private static readonly IEnumerable<Validator> Validators = new[]
         {
