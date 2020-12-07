@@ -15,6 +15,7 @@ namespace Aoc2020
         public async ValueTask ExecuteAsync(IConsole console)
         {
             var sampleGraph = LoadGraph("input/07-sample");
+            var sampleGraph2 = LoadGraph("input/07-sample2");
             var inputGraph = LoadGraph("input/07-input");
 
             var shinyGold = new BagColor("shiny gold");
@@ -22,7 +23,16 @@ namespace Aoc2020
             console.Output.WriteLine(AllColorsFor(sampleGraph, shinyGold).ToList().Count);
             console.Output.WriteLine(AllColorsFor(inputGraph, shinyGold).ToList().Count);
 
+            console.Output.WriteLine(CountInsideBags(sampleGraph, shinyGold));
+            console.Output.WriteLine(CountInsideBags(sampleGraph2, shinyGold));
+            console.Output.WriteLine(CountInsideBags(inputGraph, shinyGold));
         }
+
+        static int CountInsideBags(AdjacencyGraph<BagColor, BagEdge> graph, BagColor toCount) => graph
+           .OutEdges(toCount)
+           .Select(e => e.Quantity + e.Quantity * CountInsideBags(graph, e.Target))
+           .Sum();
+
         static IEnumerable<BagColor> AllColorsFor(AdjacencyGraph<BagColor, BagEdge> graph, BagColor color)
         {
             return _(graph, color).Distinct();
