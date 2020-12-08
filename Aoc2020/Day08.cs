@@ -14,29 +14,69 @@ namespace Aoc2020
     {
         public async ValueTask ExecuteAsync(IConsole console)
         {
-            var sampleMachine = LoadMachine("input/08-sample");
-            var inputMachine = LoadMachine("input/08-input");
+            var sampleProgram = LoadProgram("input/08-sample");
+            var inputProgram = LoadProgram("input/08-input");
 
-            console.Output.WriteLine(sampleMachine.RunUntilInfLoop().Accumulator);
-            console.Output.WriteLine(inputMachine.RunUntilInfLoop().Accumulator);
+            console.Output.WriteLine(LoadMachine(sampleProgram).Run().Accumulator);
+            console.Output.WriteLine(LoadMachine(inputProgram).Run().Accumulator);
+
+            FindGoodProgram(sampleProgram);
+            FindGoodProgram(inputProgram);
+
+            void FindGoodProgram(List<Instruction> initialProgram) => CreateAlternatePrograms(initialProgram)
+               .Select(LoadMachine)
+               .Select(m => m.Run())
+               .First(m => m.IsTerminated)
+               .Then(m => console.Output.WriteLine(m.Accumulator));
         }
 
-        static Machine LoadMachine(string filename) => File.ReadAllLines(filename)
+        static List<Instruction> LoadProgram(string filename) => File
+           .ReadAllLines(filename)
            .Select(ParseInstruction)
-           .Then(program => new Machine(0, program.ToList(), new List<int>(), 0));
+           .ToList();
 
+        static Machine LoadMachine(List<Instruction> program) => new Machine(0, program.ToList(), new List<int>(), 0);
         static Instruction ParseInstruction(string line) => InstructionParsingRegex.Deserialize<Instruction>(line);
         static readonly Regex InstructionParsingRegex = new(@"^(?<Op>[a-z]{3}) (?<Argument>[\+\-0-9]+)$", RegexOptions.Compiled);
+
+        IEnumerable<List<Instruction>> CreateAlternatePrograms(List<Instruction> initialProgram)
+        {
+            return Enumerable.Range(0, initialProgram.Count)
+               .Where(ShouldSwapInstruction)
+               .Select(SwapInstructionAt)
+               .ToList();
+
+            bool ShouldSwapInstruction(int i) => initialProgram[i].Op == "nop" || initialProgram[i].Op == "jmp";
+
+            List<Instruction> SwapInstructionAt(int i)
+            {
+                var newInstr = initialProgram[i] with {
+                    Op = initialProgram[i].Op switch
+                    {
+                        "jmp" => "nop",
+                        "nop" => "jmp",
+                        _ => throw new InvalidOperationException("invalid instruction swap")
+                    }
+                };
+
+                return Enumerable.Empty<Instruction>()
+                   .Concat(initialProgram.Take(i))
+                   .Concat(new[]{newInstr})
+                   .Concat(initialProgram.Skip(i + 1))
+                   .ToList();
+            }
+        }
     }
 
     public record Machine(int Accumulator, List<Instruction> Instructions, List<int> AlreadyExecuted, int CurrentInstructionPointer)
     {
         public Instruction CurrentInstruction => Instructions[CurrentInstructionPointer];
+        public bool IsTerminated => CurrentInstructionPointer == Instructions.Count;
 
-        public Machine RunUntilInfLoop()
+        public Machine Run()
         {
             var machine = this;
-            while (!machine.AlreadyExecuted.Contains(machine.CurrentInstructionPointer))
+            while (!machine.AlreadyExecuted.Contains(machine.CurrentInstructionPointer) && !machine.IsTerminated)
             {
                 machine = machine.ExecuteCurrentInstruction();
             }
