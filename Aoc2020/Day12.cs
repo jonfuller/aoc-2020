@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -15,28 +14,27 @@ namespace Aoc2020
     {
         public async ValueTask ExecuteAsync(IConsole console)
         {
-            var initialFerry = new Ferry(Direction.East, new Point(0, 0));
+            var initialFerry = new Ferry(Direction.East, Point.Origin);
+            var initialFerry2 = new Ferry2(new Point(10, 1), Point.Origin);
             var sampleRoute = File
                .ReadAllLines("input/12-sample")
-               .Select(ParseInstruction);
+               .Select(ParseInstruction)
+               .ToList();
             var inputRoute = File
                .ReadAllLines("input/12-input")
-               .Select(ParseInstruction);
+               .Select(ParseInstruction)
+               .ToList();
 
-            NavigateFerry(initialFerry, sampleRoute)
-               .Then(ManhattanDistance)
-               .Then(d => console.Output.WriteLine(d));
-            NavigateFerry(initialFerry, inputRoute)
-               .Then(ManhattanDistance)
-               .Then(d => console.Output.WriteLine(d));
+            console.Output.WriteLine(NavigateFerry(initialFerry, sampleRoute).ManhattanDistanceFromOrigin);
+            console.Output.WriteLine(NavigateFerry(initialFerry, inputRoute).ManhattanDistanceFromOrigin);
+            console.Output.WriteLine(NavigateFerry(initialFerry2, sampleRoute).ManhattanDistanceFromOrigin);
+            console.Output.WriteLine(NavigateFerry(initialFerry2, inputRoute).ManhattanDistanceFromOrigin);
 
-            Point NavigateFerry(Ferry ferry, IEnumerable<FerryInstruction> route) => route
+            Point NavigateFerry(IFerry ferry, IEnumerable<FerryInstruction> route) => route
                .Aggregate(
-                    seed: new Ferry(Direction.East, new Point(0, 0)),
+                    seed: ferry,
                     func: (acc, obj) => acc.Move(obj),
-                    resultSelector: ferry => ferry.Position);
-
-            int ManhattanDistance(Point fromOrigin) => Math.Abs(fromOrigin.X) + Math.Abs(fromOrigin.Y);
+                    resultSelector: final => final.Position);
         }
 
         private static readonly Regex InstructionPattern = new(@"^(?<Action>[NESWFLR]{1})(?<Amount>[0-9]{1,})$");
@@ -44,30 +42,68 @@ namespace Aoc2020
             InstructionPattern.Deserialize<FerryInstruction>(line);
     }
 
-    public enum Direction { North, East, South, West}
-    public record Ferry(Direction Facing, Point Position)
+    public interface IFerry
     {
-        public Ferry Move(FerryInstruction toMove) => toMove.Action switch
+        IFerry Move(FerryInstruction toMove);
+        Point Position { get; }
+    }
+    public record Ferry2(Point WayPointPosition, Point Position) : IFerry
+    {
+        public IFerry Move(FerryInstruction toMove) => toMove.Action switch
         {
-            "F" => this with { Position = MoveForward(toMove.Amount)},
-            "L" => this with { Facing = TurnLeft(toMove.Amount) },
-            "R" => this with { Facing = TurnRight(toMove.Amount) },
+            "F" => this with { Position = Position.OffsetTimes(toMove.Amount, WayPointPosition) },
+            "L" => this with { WayPointPosition = WayPointPosition.RotateLeft(toMove.Amount) },
+            "R" => this with { WayPointPosition = WayPointPosition.RotateRight(toMove.Amount) },
+            "N" => this with { WayPointPosition = WayPointPosition.OffsetY(toMove.Amount) },
+            "E" => this with { WayPointPosition = WayPointPosition.OffsetX(toMove.Amount) },
+            "S" => this with { WayPointPosition = WayPointPosition.OffsetY(-toMove.Amount) },
+            "W" => this with { WayPointPosition = WayPointPosition.OffsetX(-toMove.Amount) },
+            _ => throw new InvalidOperationException($"bad instruction action: {toMove}")
+        };
+    }
+    public record Ferry(Direction Facing, Point Position) : IFerry
+    {
+        public IFerry Move(FerryInstruction toMove) => toMove.Action switch
+        {
+            "F" => this with { Position = MoveForward(toMove.Amount) },
+            "L" => this with { Facing = Facing.TurnLeft(toMove.Amount) },
+            "R" => this with { Facing = Facing.TurnRight(toMove.Amount) },
             "N" => this with { Position = MoveDirection(Direction.North, toMove.Amount) },
             "E" => this with { Position = MoveDirection(Direction.East, toMove.Amount) },
             "S" => this with { Position = MoveDirection(Direction.South, toMove.Amount) },
             "W" => this with { Position = MoveDirection(Direction.West, toMove.Amount) },
+            _ => throw new InvalidOperationException($"bad instruction action: {toMove}")
         };
 
-        Direction TurnLeft(int degrees) => (Direction)(((int)Facing - degrees / 90 + 4)%4);
-        Direction TurnRight(int degrees) => (Direction)(((int)Facing + degrees / 90)%4);
         Point MoveForward(int amount) => MoveDirection(Facing, amount);
         Point MoveDirection(Direction direction, int amount) => direction switch
         {
-            Direction.North => new Point(Position.X, Position.Y + amount),
-            Direction.East => new Point(Position.X + amount, Position.Y),
-            Direction.South => new Point(Position.X, Position.Y - amount),
-            Direction.West => new Point(Position.X - amount, Position.Y),
+            Direction.North => Position.OffsetY(amount),
+            Direction.East => Position.OffsetX(amount),
+            Direction.South => Position.OffsetY(-amount),
+            Direction.West => Position.OffsetX(-amount),
             _ => throw new InvalidOperationException()
+        };
+    }
+
+    public record Point(int X, int Y)
+    {
+        public static Point Origin => new(0, 0);
+
+        public Point OffsetTimes(int times, Point other) => this with { X = X + other.X*times, Y = Y + other.Y*times };
+        public Point Offset(Point other) => this with { X = X + other.X, Y = Y + other.Y };
+        public Point OffsetY(int dy) => this with { Y = Y + dy };
+        public Point OffsetX(int dx) => this with { X = X + dx };
+
+        public int ManhattanDistanceFromOrigin => Math.Abs(X) + Math.Abs(Y);
+        
+        public Point RotateLeft(int degrees) => RotateRight(360-degrees);
+        public Point RotateRight(int degrees) => (degrees / 90 % 4) switch
+        {
+            0 => this,
+            1 => new Point(Y, -X),
+            2 => new Point(-X, -Y),
+            3 => new Point(-Y, X),
         };
     }
 
@@ -75,5 +111,14 @@ namespace Aoc2020
     {
         public string Action { get; init; }
         public int Amount { get; init; }
+    }
+
+    public enum Direction { North, East, South, West }
+    public static class DirectionExtensions
+    {
+        public static Direction TurnLeft(this Direction target, int degrees) =>
+            (Direction)(((int)target - degrees / 90 + 4) % 4);
+        public static Direction TurnRight(this Direction target, int degrees) =>
+            (Direction)(((int)target + degrees / 90) % 4);
     }
 }
